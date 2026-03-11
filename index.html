@@ -1,0 +1,204 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Mini Games</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      background: #0a0a0f;
+      color: #e0e0e0;
+      font-family: 'Courier New', monospace;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 48px 24px;
+    }
+
+    header {
+      text-align: center;
+      margin-bottom: 56px;
+    }
+
+    h1 {
+      font-size: 3rem;
+      letter-spacing: 0.2em;
+      text-transform: uppercase;
+      color: #fff;
+      text-shadow: 0 0 20px #7c3aed, 0 0 60px #7c3aed44;
+    }
+
+    h1 span {
+      color: #a855f7;
+    }
+
+    .subtitle {
+      margin-top: 10px;
+      color: #666;
+      font-size: 0.85rem;
+      letter-spacing: 0.15em;
+    }
+
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+      gap: 24px;
+      width: 100%;
+      max-width: 1000px;
+    }
+
+    .card {
+      background: #13131a;
+      border: 1px solid #2a2a3a;
+      border-radius: 8px;
+      padding: 28px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      transition: border-color 0.2s, box-shadow 0.2s;
+    }
+
+    .card:not(.card--coming-soon):hover {
+      border-color: #7c3aed;
+      box-shadow: 0 0 20px #7c3aed22;
+    }
+
+    .card--coming-soon {
+      opacity: 0.45;
+    }
+
+    .card-title {
+      font-size: 1.4rem;
+      font-weight: bold;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      color: #fff;
+    }
+
+    .card-description {
+      font-size: 0.85rem;
+      color: #999;
+      line-height: 1.6;
+      flex: 1;
+    }
+
+    .card-controls {
+      font-size: 0.75rem;
+      color: #555;
+      letter-spacing: 0.05em;
+    }
+
+    .card-controls span {
+      color: #7c3aed;
+      margin-right: 6px;
+    }
+
+    .play-btn {
+      display: inline-block;
+      margin-top: 8px;
+      padding: 10px 24px;
+      background: transparent;
+      border: 1px solid #7c3aed;
+      border-radius: 4px;
+      color: #a855f7;
+      font-family: 'Courier New', monospace;
+      font-size: 0.85rem;
+      letter-spacing: 0.15em;
+      text-transform: uppercase;
+      text-decoration: none;
+      text-align: center;
+      transition: background 0.2s, color 0.2s;
+      cursor: pointer;
+    }
+
+    .play-btn:hover {
+      background: #7c3aed;
+      color: #fff;
+    }
+
+    .coming-soon-badge {
+      display: inline-block;
+      margin-top: 8px;
+      padding: 10px 24px;
+      border: 1px solid #333;
+      border-radius: 4px;
+      color: #444;
+      font-size: 0.85rem;
+      letter-spacing: 0.15em;
+      text-transform: uppercase;
+      text-align: center;
+    }
+
+    footer {
+      margin-top: 64px;
+      color: #333;
+      font-size: 0.75rem;
+      letter-spacing: 0.1em;
+    }
+  </style>
+</head>
+<body>
+
+<header>
+  <h1>MINI <span>GAMES</span></h1>
+  <p class="subtitle">SELECT A GAME TO PLAY</p>
+</header>
+
+<div class="grid" id="game-grid"></div>
+
+<footer>INSERT COIN TO CONTINUE</footer>
+
+<script>
+  // ─────────────────────────────────────────────────────────────────────────
+  // ADDING A NEW GAME
+  // 1. Add an entry to the GAMES array below.
+  // 2. Add a vite.config.js to the game folder (see brickout/vite.config.js).
+  // 3. Add a build command in the root package.json scripts.
+  // ─────────────────────────────────────────────────────────────────────────
+  const GAMES = [
+    {
+      title: 'Brickout',
+      description: 'Classic brick-breaking action. Bounce the ball to clear every brick before you run out of lives.',
+      controls: 'Arrow Keys',
+      path: '/brickout/',
+    },
+    {
+      title: 'Pong',
+      description: 'The original arcade classic. Face off against an AI opponent and first to 7 wins.',
+      controls: 'Arrow Keys / WASD',
+      path: '/pong-game/',
+    },
+    {
+      title: 'AI-roids',
+      description: 'Asteroids with an AI twist. Blast rocks, survive the void.',
+      controls: 'Arrow Keys + Space',
+      path: '/roids/',
+    },
+  ]
+  // ─────────────────────────────────────────────────────────────────────────
+
+  const grid = document.getElementById('game-grid')
+
+  GAMES.forEach(game => {
+    const available = game.path !== null
+
+    const card = document.createElement('div')
+    card.className = 'card' + (available ? '' : ' card--coming-soon')
+    card.innerHTML = `
+      <div class="card-title">${game.title}</div>
+      <div class="card-description">${game.description}</div>
+      ${game.controls ? `<div class="card-controls"><span>&#9679;</span>${game.controls}</div>` : ''}
+      ${available
+        ? `<a class="play-btn" href="${game.path}">&#9654; Play</a>`
+        : `<div class="coming-soon-badge">Coming Soon</div>`
+      }
+    `
+    grid.appendChild(card)
+  })
+</script>
+
+</body>
+</html>

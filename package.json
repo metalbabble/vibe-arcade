@@ -1,0 +1,11 @@
+{
+  "name": "mini-games",
+  "private": true,
+  "scripts": {
+    "build": "npm run build:brickout && npm run build:pong-game && npm run build:roids && cp index.html dist/",
+    "build:brickout": "cd brickout && npm install && npm run build",
+    "build:pong-game": "cd pong-game && npm install && npm run build",
+    "build:roids": "cp -r roids/public dist/roids",
+    "serve": "npx serve dist -p 8080"
+  }
+}
