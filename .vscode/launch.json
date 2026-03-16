@@ -1,0 +1,33 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "Serve & Open (default browser)",
+      "type": "node",
+      "request": "launch",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["run", "serve"],
+      "cwd": "${workspaceFolder}",
+      "serverReadyAction": {
+        "pattern": "Accepting connections at (http://localhost:\\d+)",
+        "uriFormat": "%s",
+        "action": "openExternally"
+      },
+      "console": "integratedTerminal"
+    },
+    {
+      "name": "Serve & Debug in Firefox",
+      "type": "node",
+      "request": "launch",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["run", "serve"],
+      "cwd": "${workspaceFolder}",
+      "serverReadyAction": {
+        "pattern": "Accepting connections at (http://localhost:\\d+)",
+        "uriFormat": "%s",
+        "action": "debugWithFirefox"
+      },
+      "console": "integratedTerminal"
+    }
+  ]
+}
