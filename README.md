@@ -4,6 +4,8 @@ A spiffy collection of retro arcade games - I've used this project as an experim
 
 Games live under `games/` and are built independently via Vite. Games are launched from a static launcher page.
 
+[Try out Vibe Arcade here!](https://metalbabble.github.io/vibe-arcade/)
+
 ![Game screenshot 1](screenshot1.png)
 ![Game screenshot 2](screenshot2.png)
 
