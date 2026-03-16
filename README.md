@@ -1,6 +1,11 @@
 # VibeArcade
 
-A web-based launcher for small, self-contained arcade games. Games live under `games/` and are built independently via Vite. The launcher is a static page served alongside them.
+A spiffy collection of retro arcade games - I've used this project as an experiment to learn ways to leverage AI in game development workflows. (Thus the name!)
+
+Games live under `games/` and are built independently via Vite. Games are launched from a static launcher page.
+
+![Game screenshot 1](screenshot1.png)
+![Game screenshot 2](screenshot2.png)
 
 ## Running Locally
 
