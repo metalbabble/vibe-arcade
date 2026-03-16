@@ -63,7 +63,7 @@ export default class GameScene extends Phaser.Scene {
     this.wallGroup = null;
     this.wallGrid  = null;
 
-    if (this.cfg.walls || this.cfg.bouncy) {
+    if (this.cfg.walls) {
       const clearZones = [
         { col: 0,             row: this.ROWS - 3, w: 3, h: 3 }, // player (bottom-left)
         { col: this.COLS - 3, row: 0,             w: 3, h: 3 }  // AI (top-right)
