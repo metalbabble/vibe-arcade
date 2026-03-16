@@ -154,9 +154,10 @@
 <script>
   // ─────────────────────────────────────────────────────────────────────────
   // ADDING A NEW GAME
-  // 1. Add an entry to the GAMES array below.
-  // 2. Add a vite.config.js to the game folder (see brickout/vite.config.js).
-  // 3. Add a build command in the root package.json scripts.
+  // 1. Create games/my-game/ with package.json, vite.config.js, index.html,
+  //    and src/main.js (see any existing game for the template).
+  // 2. Add an entry to the GAMES array below.
+  // See README.md for the full guide.
   // ─────────────────────────────────────────────────────────────────────────
   const GAMES = [
     {
@@ -188,6 +189,12 @@
       description: 'Rows of mean alien faces march ever closer. Blast them from your ship before they reach the ground — or they\'ll reach you first.',
       controls: 'Arrow Keys + Space',
       path: '/face-invaders/',
+    },
+    {
+      title: 'Conflict',
+      description: 'Tank combat against a cunning AI. Choose your arena settings, pick a difficulty, and blast the enemy tank before it blasts you — first to 5 hits wins.',
+      controls: 'Arrow Keys + Space',
+      path: '/conflict/',
     },
   ]
   // ─────────────────────────────────────────────────────────────────────────
