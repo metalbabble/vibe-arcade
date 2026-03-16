@@ -1,0 +1,27 @@
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  background: #0a0a0f;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  min-height: 100vh;
+  font-family: 'Courier New', monospace;
+}
+
+canvas {
+  display: block;
+  border: 1px solid #7c3aed;
+  box-shadow: 0 0 24px #7c3aed44;
+}
+
+.back-link {
+  margin-top: 18px;
+  color: #555;
+  font-size: 0.78rem;
+  letter-spacing: 0.12em;
+  text-decoration: none;
+  transition: color 0.2s;
+}
+.back-link:hover { color: #a855f7; }
