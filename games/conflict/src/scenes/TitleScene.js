@@ -55,7 +55,7 @@ export default class TitleScene extends Phaser.Scene {
       fontSize: '11px', fontFamily: 'monospace', color: '#224422'
     }).setOrigin(0.5);
 
-    this.add.text(W / 2, H - 18, 'INSPIRED BY ATARI COMBAT  (1977)', {
+    this.add.text(W / 2, H - 18, 'INSPIRED BY THE CLASSICS', {
       fontSize: '11px', fontFamily: 'monospace', color: '#1a2a1a'
     }).setOrigin(0.5);
 
