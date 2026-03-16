@@ -399,6 +399,7 @@ export default class GameScene extends Phaser.Scene {
 
     // ── World bounds bounce / destroy ─────────────────────────────
     if (this.cfg.bouncy) {
+      m.setBounce(1, 1);
       m.setCollideWorldBounds(true);
       m.body.onWorldBounds = true;
 
