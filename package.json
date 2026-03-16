@@ -1,14 +1,15 @@
 {
   "name": "vibe-arcade",
   "private": true,
+  "workspaces": ["games/*"],
   "scripts": {
-    "build": "npm run build:brickout && npm run build:pong-game && npm run build:roids && npm run build:sentra-pede && npm run build:face-invaders && npm run build:conflict && cp index.html dist/",
-    "build:brickout": "cd brickout && npm install && npm run build && cp ../shared/touch-controller.js ../dist/brickout/",
-    "build:pong-game": "cd pong-game && npm install && npm run build && cp ../shared/touch-controller.js ../dist/pong-game/",
-    "build:roids": "cp -r roids/public dist/roids && cp shared/touch-controller.js dist/roids/",
-    "build:sentra-pede": "mkdir -p dist/sentra-pede && cp -r sentra-pede/public/* dist/sentra-pede/ && cp shared/touch-controller.js dist/sentra-pede/",
-    "build:face-invaders": "mkdir -p dist/face-invaders && cp -r face-invaders/public/* dist/face-invaders/ && cp shared/touch-controller.js dist/face-invaders/",
-    "build:conflict": "mkdir -p dist/conflict && cp -r conflict/public/* dist/conflict/ && cp shared/touch-controller.js dist/conflict/",
+    "build": "npm run build --workspaces --if-present && cp index.html dist/",
     "serve": "npx serve dist -p 8080"
+  },
+  "devDependencies": {
+    "vite": "^7.3.1"
+  },
+  "dependencies": {
+    "phaser": "^3.90.0"
   }
 }

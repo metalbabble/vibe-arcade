@@ -1,100 +1,173 @@
 # VibeArcade
 
-A web-based launcher for small self-contained arcade games. Each game lives in its own folder and is built independently with Vite. The launcher is a static page served alongside the built games.
+A web-based launcher for small, self-contained arcade games. Games live under `games/` and are built independently via Vite. The launcher is a static page served alongside them.
 
 ## Running Locally
 
 ```sh
 # From the VibeArcade root
-npm run build   # builds all games + copies launcher to dist/
-npm run serve   # serves dist/ at http://localhost:8080
+npm install       # installs all workspace deps (vite, phaser, etc.) once
+npm run build     # builds all games + copies launcher to dist/
+npm run serve     # serves dist/ at http://localhost:8080
 ```
 
 ## Project Structure
 
 ```
-VibeArcade/
-├── index.html          # launcher page (edit to add game cards)
-├── package.json        # root build scripts
-├── dist/               # build output (git-ignored)
-│   ├── index.html
-│   ├── brickout/
-│   └── pong-game/
-├── brickout/           # game folder
-├── pong-game/          # game folder
-└── roids/              # game folder
+vibe-arcade/
+├── index.html          # arcade launcher (edit GAMES array to add cards)
+├── package.json        # workspace root — shared deps (vite, phaser) live here
+├── shared/
+│   └── touch-controller.js   # mobile joystick overlay, imported by every game
+├── games/
+│   ├── brickout/       # Vite + Phaser 3 game
+│   ├── pong-game/      # Vite + Phaser 3 game
+│   ├── roids/          # Vite + vanilla Canvas game
+│   ├── sentra-pede/    # Vite + vanilla Canvas game
+│   ├── face-invaders/  # Vite + vanilla Canvas game
+│   └── conflict/       # Vite + Phaser 3 game (multi-scene)
+└── dist/               # build output (git-ignored)
+    ├── index.html
+    ├── brickout/
+    ├── pong-game/
+    └── ...
 ```
 
-Most game folders are Vite + Phaser 3 projects. Plain static games (like `roids/`) can skip the Vite setup — see the plain HTML path below.
+Each game folder is an **npm workspace package**. Running `npm install` at the root hoists all shared dependencies (Vite, Phaser) into a single top-level `node_modules` — no duplicate installs.
 
-## Adding a New Game
+## Architecture
 
-There are two paths depending on whether the game uses a build tool.
+### Every game follows the same pattern
+
+```
+games/my-game/
+├── package.json      # { "name": "@arcade/my-game", "scripts": { "build": "vite build" } }
+├── vite.config.js    # sets base URL and outDir
+├── index.html        # entry point — one <script type="module" src="./src/main.js">
+├── src/
+│   └── main.js       # imports game logic + touch-controller
+└── public/           # optional: static assets copied as-is (e.g. legacy game.js)
+```
+
+### touch-controller
+
+`shared/touch-controller.js` is a self-contained IIFE that injects a virtual joystick overlay for mobile. Every game imports it as a side-effect:
+
+```js
+import '../../../shared/touch-controller.js'
+```
+
+Vite bundles it in. No manual copying needed.
+
+### Vanilla Canvas games (roids, sentra-pede, face-invaders)
+
+These games keep their raw `game.js` in `public/` (Vite copies it unchanged to `dist/`). The `src/main.js` only imports the touch-controller. No game logic changes were needed to integrate them into the build system.
+
+### Phaser games (brickout, pong-game, conflict)
+
+Phaser is imported from npm and bundled by Vite. The `conflict` game uses multiple scenes organised under `src/scenes/`, `src/ai/`, and `src/utils/` as proper ES modules.
 
 ---
 
-### Path A — Vite project (brickout, pong-game style)
+## Adding a New Game
 
-#### 1. Create the game folder
+### 1. Create the game folder
 
-Build it as a standard Vite project. The game should have an `index.html` entry point and a `package.json` with a `build` script.
+```sh
+mkdir games/my-game
+```
 
-#### 2. Add `vite.config.js` to the game folder
+### 2. Add `package.json`
+
+```json
+{
+  "name": "@arcade/my-game",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "scripts": {
+    "build": "vite build"
+  }
+}
+```
+
+No need to add `vite` or `phaser` as dependencies — they're inherited from the workspace root.
+
+### 3. Add `vite.config.js`
 
 ```js
 import { defineConfig } from 'vite'
 
 export default defineConfig({
-  base: '/my-new-game/',
+  base: '/my-game/',
   build: {
-    outDir: '../dist/my-new-game',
+    outDir: '../../dist/my-game',
     emptyOutDir: true,
   },
 })
 ```
 
-Replace `my-new-game` with the actual folder name.
+### 4. Add `index.html`
 
-#### 3. Add a build command to root `package.json`
-
-```json
-"build:my-new-game": "cd my-new-game && npm install && npm run build"
+```html
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>My Game</title>
+</head>
+<body>
+  <div id="app"></div>
+  <script type="module" src="./src/main.js"></script>
+</body>
+</html>
 ```
 
-Then append it to the main `build` script:
+### 5. Add `src/main.js`
 
-```json
-"build": "... && npm run build:my-new-game && cp index.html dist/"
+Import your game code and the touch-controller:
+
+```js
+import Phaser from 'phaser'
+import '../../../shared/touch-controller.js'
+
+// your game setup here
+new Phaser.Game({ ... })
 ```
 
----
+Or for a vanilla Canvas game, put game logic in `public/game.js` (static copy), reference it from `index.html` as `<script src="./game.js">`, and keep `src/main.js` minimal:
 
-### Path B — Plain static HTML (roids style)
-
-If the game is just HTML/CSS/JS with no build step, put all game files in a `public/` subfolder and add a single copy command to root `package.json`:
-
-```json
-"build:my-new-game": "cp -r my-new-game/public dist/my-new-game"
+```js
+import '../../../shared/touch-controller.js'
 ```
 
-No `vite.config.js` needed.
+### 6. Register the game in `index.html` (launcher)
 
----
-
-### Final step — Add a card to `index.html`
-
-In the `GAMES` array near the top of `index.html`, add an entry:
+Open the root `index.html` and add an entry to the `GAMES` array:
 
 ```js
 {
-  title: 'My New Game',
-  description: 'Short description of the game.',
-  controls: 'Arrow Keys',
-  path: '/my-new-game/',
+  title: 'My Game',
+  description: 'Short description.',
+  controls: 'Arrow Keys + Space',
+  path: '/my-game/',
 },
 ```
 
-Set `path: null` while the game is still in development — it will render as "Coming Soon" automatically.
+Set `path: null` while still in development — the card will render as "Coming Soon".
+
+### 7. Build and verify
+
+```sh
+npm run build
+npm run serve
+# open http://localhost:8080
+```
+
+The new game is automatically picked up by `npm run build` via npm workspaces — no changes to the root `package.json` scripts required.
+
+---
 
 ## Deploying
 
