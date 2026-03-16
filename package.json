@@ -1,5 +1,5 @@
 {
-  "name": "mini-games",
+  "name": "vibe-arcade",
   "private": true,
   "scripts": {
     "build": "npm run build:brickout && npm run build:pong-game && npm run build:roids && npm run build:sentra-pede && npm run build:face-invaders && cp index.html dist/",

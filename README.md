@@ -1,11 +1,11 @@
-# Mini Games Launcher
+# VibeArcade
 
 A web-based launcher for small self-contained arcade games. Each game lives in its own folder and is built independently with Vite. The launcher is a static page served alongside the built games.
 
 ## Running Locally
 
 ```sh
-# From the mini-games root
+# From the VibeArcade root
 npm run build   # builds all games + copies launcher to dist/
 npm run serve   # serves dist/ at http://localhost:8080
 ```
@@ -13,7 +13,7 @@ npm run serve   # serves dist/ at http://localhost:8080
 ## Project Structure
 
 ```
-mini-games/
+VibeArcade/
 ├── index.html          # launcher page (edit to add game cards)
 ├── package.json        # root build scripts
 ├── dist/               # build output (git-ignored)
