@@ -1,7 +1,9 @@
 import { defineConfig } from 'vite'
 
+const repoBase = process.env.REPO_BASE ?? ''
+
 export default defineConfig({
-  base: '/brickout/',
+  base: repoBase + '/brickout/',
   build: {
     outDir: '../../dist/brickout',
     emptyOutDir: true,
