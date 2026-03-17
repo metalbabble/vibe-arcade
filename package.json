@@ -3,7 +3,7 @@
   "private": true,
   "workspaces": ["games/*"],
   "scripts": {
-    "build": "npm run build --workspaces --if-present && cp index.html dist/",
+    "build": "npm run build --workspaces --if-present && cp index.html icon.png dist/",
     "serve": "npx serve dist -p 8080"
   },
   "devDependencies": {
