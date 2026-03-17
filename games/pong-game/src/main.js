@@ -4,6 +4,7 @@ import '../../../shared/touch-controller.js'
 
 const config = {
   type: Phaser.AUTO,
+  parent: 'app',
   backgroundColor: '#000000',
   scene: [GameScene],
   physics: {
