@@ -83,28 +83,48 @@
         pointer-events: all;
         touch-action: none;
       }
-      #vibe-stick-base {
+      #vibe-dpad {
         position: absolute;
-        display: none;
-        width: 118px; height: 118px;
-        border-radius: 50%;
-        background: rgba(124,58,237,0.13);
-        border: 2px solid rgba(168,85,247,0.42);
-        box-shadow: 0 0 22px rgba(124,58,237,0.22), inset 0 0 14px rgba(124,58,237,0.08);
-        transform: translate(-50%,-50%);
-        pointer-events: none;
+        left: 50%; top: 50%;
+        transform: translate(-50%, -50%);
+        width: 130px; height: 130px;
       }
-      #vibe-stick-thumb {
+      .vibe-dpad-arrow {
         position: absolute;
-        width: 46px; height: 46px;
+        width: 36px; height: 36px;
+        border-radius: 50%;
+        border: 2px solid rgba(168,85,247,0.52);
+        background: rgba(124,58,237,0.17);
+        box-shadow: 0 0 18px rgba(124,58,237,0.22);
+        color: rgba(220,190,255,0.72);
+        font-family: 'Courier New', Courier, monospace;
+        font-weight: bold;
+        font-size: 14px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        pointer-events: none;
+        transition: background 0.07s, box-shadow 0.07s, color 0.07s;
+      }
+      .vibe-dpad-arrow.lit {
+        background: rgba(124,58,237,0.55);
+        box-shadow: 0 0 32px rgba(168,85,247,0.65);
+        color: #fff;
+      }
+      #vibe-dpad-up    { top: 0;    left: 50%; transform: translateX(-50%); }
+      #vibe-dpad-down  { bottom: 0; left: 50%; transform: translateX(-50%); }
+      #vibe-dpad-left  { left: 0;   top: 50%;  transform: translateY(-50%); }
+      #vibe-dpad-right { right: 0;  top: 50%;  transform: translateY(-50%); }
+      #vibe-dpad-dot {
+        position: absolute;
+        width: 28px; height: 28px;
         border-radius: 50%;
         background: radial-gradient(circle at 38% 33%, rgba(210,170,255,0.92), rgba(124,58,237,0.78));
         border: 2px solid rgba(168,85,247,0.85);
         box-shadow: 0 0 14px rgba(168,85,247,0.55);
-        top: 50%; left: 50%;
-        transform: translate(-50%,-50%);
+        left: 51px; top: 51px;
         pointer-events: none;
-        transition: top 0.04s linear, left 0.04s linear;
+        transition: left 0.05s linear, top 0.05s linear;
       }
 
       /* ── buttons ── */
@@ -152,8 +172,12 @@
     overlay.id = 'vibe-tc-overlay';
     overlay.innerHTML = `
       <div id="vibe-stick-zone">
-        <div id="vibe-stick-base">
-          <div id="vibe-stick-thumb"></div>
+        <div id="vibe-dpad">
+          <div class="vibe-dpad-arrow" id="vibe-dpad-up">▲</div>
+          <div class="vibe-dpad-arrow" id="vibe-dpad-down">▼</div>
+          <div class="vibe-dpad-arrow" id="vibe-dpad-left">◄</div>
+          <div class="vibe-dpad-arrow" id="vibe-dpad-right">►</div>
+          <div id="vibe-dpad-dot"></div>
         </div>
       </div>
       <div id="vibe-btn-zone">
@@ -170,10 +194,30 @@
 
   // ── Joystick ──────────────────────────────────────────────────────────────
   function wireJoystick() {
-    const zone  = document.getElementById('vibe-stick-zone');
-    const base  = document.getElementById('vibe-stick-base');
-    const thumb = document.getElementById('vibe-stick-thumb');
-    const DEAD = 14, MAX = 44;
+    const zone       = document.getElementById('vibe-stick-zone');
+    const dot        = document.getElementById('vibe-dpad-dot');
+    const arrowUp    = document.getElementById('vibe-dpad-up');
+    const arrowDown  = document.getElementById('vibe-dpad-down');
+    const arrowLeft  = document.getElementById('vibe-dpad-left');
+    const arrowRight = document.getElementById('vibe-dpad-right');
+    const DEAD = 14, MAX = 44, DOT_MAX = 28, DOT_CENTER = 51;
+
+    function updateDpad(dx, dy) {
+      const dist = Math.sqrt(dx * dx + dy * dy);
+      const t = dist > 0 ? Math.min(dist, MAX) / MAX * DOT_MAX / dist : 0;
+      dot.style.left = (DOT_CENTER + dx * t) + 'px';
+      dot.style.top  = (DOT_CENTER + dy * t) + 'px';
+      arrowLeft.classList.toggle('lit',  dx < -DEAD);
+      arrowRight.classList.toggle('lit', dx > DEAD);
+      arrowUp.classList.toggle('lit',    dy < -DEAD);
+      arrowDown.classList.toggle('lit',  dy > DEAD);
+    }
+
+    function resetDpad() {
+      dot.style.left = DOT_CENTER + 'px';
+      dot.style.top  = DOT_CENTER + 'px';
+      [arrowUp, arrowDown, arrowLeft, arrowRight].forEach(a => a.classList.remove('lit'));
+    }
 
     zone.addEventListener('touchstart', e => {
       e.preventDefault();
@@ -184,9 +228,6 @@
       joystick.touchId = t.identifier;
       joystick.baseX = t.clientX;
       joystick.baseY = t.clientY;
-      base.style.left = t.clientX + 'px';
-      base.style.top  = t.clientY + 'px';
-      base.style.display = 'block';
     }, { passive: false });
 
     zone.addEventListener('touchmove', e => {
@@ -201,11 +242,8 @@
       const dx = touch.clientX - joystick.baseX;
       const dy = touch.clientY - joystick.baseY;
       const dist = Math.sqrt(dx * dx + dy * dy);
-      const clamped = Math.min(dist, MAX);
-      const angle = Math.atan2(dy, dx);
 
-      thumb.style.left = `calc(50% + ${Math.cos(angle) * clamped}px)`;
-      thumb.style.top  = `calc(50% + ${Math.sin(angle) * clamped}px)`;
+      updateDpad(dx, dy);
 
       if (dist > DEAD) {
         if (dx < -DEAD) pressKey('ArrowLeft');  else releaseKey('ArrowLeft');
@@ -222,9 +260,7 @@
         if (t.identifier === joystick.touchId) {
           joystick.active = false;
           joystick.touchId = null;
-          base.style.display = 'none';
-          thumb.style.left = '50%';
-          thumb.style.top  = '50%';
+          resetDpad();
           releaseAllDirs();
           break;
         }
