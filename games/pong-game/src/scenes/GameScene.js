@@ -40,7 +40,8 @@ export class GameScene extends Phaser.Scene {
     this.aiPaddle.body.setCollideWorldBounds(true);
     this.aiPaddle.body.setImmovable(true);
 
-    // Ball
+    // Ball — only bounce off top/bottom; left/right are scoring zones
+    this.physics.world.setBounds(0, 0, W, H, false, false, true, true);
     this.ball = this.add.rectangle(W / 2, H / 2, BALL_SIZE, BALL_SIZE, 0xffffff);
     this.physics.add.existing(this.ball, false);
     this.ball.body.setCollideWorldBounds(true);
