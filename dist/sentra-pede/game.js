@@ -15,6 +15,14 @@ const SHROOM_CNT  = 30;
 canvas.width  = COLS * CELL;                  // 600
 canvas.height = GAME_ROWS * CELL + HEADER_H;  // 660
 
+function scaleToFit() {
+  const scale = Math.min(window.innerWidth / canvas.width, window.innerHeight / canvas.height, 1);
+  canvas.style.width  = (canvas.width  * scale) + 'px';
+  canvas.style.height = (canvas.height * scale) + 'px';
+}
+scaleToFit();
+window.addEventListener('resize', scaleToFit);
+
 // ── Palette ───────────────────────────────────────────────────────────────
 const C = {
   bg:       '#0a0a0f',

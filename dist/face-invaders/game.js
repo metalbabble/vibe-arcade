@@ -11,6 +11,14 @@ const HEADER_H = 60;
 canvas.width  = W;
 canvas.height = H;
 
+function scaleToFit() {
+  const scale = Math.min(window.innerWidth / canvas.width, window.innerHeight / canvas.height, 1);
+  canvas.style.width  = (canvas.width  * scale) + 'px';
+  canvas.style.height = (canvas.height * scale) + 'px';
+}
+scaleToFit();
+window.addEventListener('resize', scaleToFit);
+
 // ── Invader grid constants ───────────────────────────────────────────────────
 const INV_COLS = 11;   // columns of invaders
 const INV_ROWS = 5;    // rows of invaders
