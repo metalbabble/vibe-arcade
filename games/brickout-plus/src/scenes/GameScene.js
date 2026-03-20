@@ -16,6 +16,10 @@ export default class GameScene extends Phaser.Scene {
     super({ key: 'GameScene' });
   }
 
+  init(data) {
+    this._gameMode = data?.mode || 'classic';
+  }
+
   create() {
     this._sound = new SoundManager();
     this._levelTransition = false;
@@ -30,7 +34,7 @@ export default class GameScene extends Phaser.Scene {
 
     this._createHUD();
     this._paddle = new Paddle(this);
-    this._bricks = new BrickGrid(this);
+    this._bricks = new BrickGrid(this, this._gameMode);
     this._particles = new ParticleManager(this);
     this._powerUps = new PowerUpManager(this);
 
