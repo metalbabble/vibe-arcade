@@ -181,30 +181,36 @@ function drawPig(gfx, x, y, dir) {
 }
 
 function drawGhost(gfx, x, y, color, frightened, flash) {
-  const r = CELL / 2 - 1
-  const c = frightened ? (flash ? 0xEEEEEE : 0x2222CC) : color
-  // Head dome
+  const r       = CELL / 2 - 1
+  const c       = frightened ? (flash ? 0xEEEEEE : 0x2222CC) : color
+  const domeCy  = y - r * 0.15
+  const bodyBot = domeCy + r * 1.1   // bottom of the rectangular body
+
   gfx.fillStyle(c, 1)
-  gfx.fillCircle(x, y - r * 0.15, r)
-  // Body rectangle
-  gfx.fillRect(x - r, y - r * 0.15, r * 2, r * 1.1)
-  // Wavy skirt (3 bumps pointing down)
-  for (let i = 0; i < 3; i++) {
-    gfx.fillCircle(x - r + r * 0.33 + i * r * 0.66, y + r * 0.95, r * 0.38)
+
+  // Dome + body rectangle
+  gfx.fillCircle(x, domeCy, r)
+  gfx.fillRect(x - r, domeCy, r * 2, r * 1.1)
+
+  // Zig-zag skirt — 3 downward-pointing triangles
+  const teeth   = 3
+  const toothW  = (r * 2) / teeth
+  const toothDp = r * 0.52
+  for (let i = 0; i < teeth; i++) {
+    const lx = x - r + i * toothW
+    const rx = lx + toothW
+    const mx = lx + toothW / 2
+    gfx.fillTriangle(lx, bodyBot, rx, bodyBot, mx, bodyBot + toothDp)
   }
-  // Notches between bumps
-  gfx.fillStyle(0x0a0a0f, 1)
-  for (let i = 0; i < 2; i++) {
-    gfx.fillCircle(x - r * 0.33 + i * r * 0.66, y + r * 0.95, r * 0.22)
-  }
+
   // Eyes
   gfx.fillStyle(frightened ? 0xFF5555 : 0xFFFFFF, 1)
   gfx.fillCircle(x - r * 0.35, y - r * 0.32, r * 0.28)
   gfx.fillCircle(x + r * 0.35, y - r * 0.32, r * 0.28)
   if (!frightened) {
     gfx.fillStyle(0x0033BB, 1)
-    gfx.fillCircle(x - r * 0.25, y - r * 0.3, r * 0.14)
-    gfx.fillCircle(x + r * 0.45, y - r * 0.3, r * 0.14)
+    gfx.fillCircle(x - r * 0.25, y - r * 0.3,  r * 0.14)
+    gfx.fillCircle(x + r * 0.45, y - r * 0.3,  r * 0.14)
   }
 }
 
