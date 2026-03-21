@@ -217,19 +217,15 @@ class TitleScene extends Phaser.Scene {
     bg.fillStyle(0x0a0a0f, 1)
     bg.fillRect(0, 0, W, H)
 
-    // Decorative maze strip across the middle
+    // Maze-grid strip behind the character row
     bg.fillStyle(0x1a0a2e, 1)
-    bg.fillRect(0, 200, W, 220)
+    bg.fillRect(0, 300, W, 150)
     bg.lineStyle(1, 0x5c1a9e, 0.4)
-    for (let x = 0; x < W; x += 26) {
-      bg.lineBetween(x, 200, x, 420)
-    }
-    for (let y = 200; y < 420; y += 26) {
-      bg.lineBetween(0, y, W, y)
-    }
+    for (let x = 0; x < W; x += 26) bg.lineBetween(x, 300, x, 450)
+    for (let y = 300; y < 450; y += 26) bg.lineBetween(0, y, W, y)
 
     // Title
-    this.add.text(W / 2, 88, 'PORC-MAN', {
+    this.add.text(W / 2, 78, 'PORC-MAN', {
       fontSize: '76px',
       fontFamily: 'Courier New, monospace',
       color: '#FF69B4',
@@ -238,37 +234,55 @@ class TitleScene extends Phaser.Scene {
       shadow: { offsetX: 0, offsetY: 0, color: '#FF69B4', blur: 30, fill: true },
     }).setOrigin(0.5)
 
-    this.add.text(W / 2, 160, 'THE MAZE-RUNNING PIG', {
+    this.add.text(W / 2, 150, 'THE MAZE-RUNNING PIG', {
       fontSize: '20px',
       fontFamily: 'Courier New, monospace',
       color: '#CC88BB',
     }).setOrigin(0.5)
 
-    // Draw decorative pigs (facing inward)
-    const pigGfx = this.add.graphics()
-    drawPig(pigGfx, 110, 300,     { dx:  1, dy: 0 })
-    drawPig(pigGfx, W - 110, 300, { dx: -1, dy: 0 })
-
-    // Instructions panel
+    // Instructions
     const lines = [
       ['ARROW KEYS / WASD', 'Move Porc-Man'],
-      ['EAT ALL DOTS',       '1 pt each — clear the maze to advance'],
-      ['PINK POWER-UPS',     '8 sec invincibility — ghosts turn blue'],
-      ['EAT BLUE GHOSTS',    '50 pts — ghost respawns elsewhere'],
-      ['AVOID GHOSTS',       'Lose a life on collision (3 lives total)'],
-      ['EACH LEVEL',         'Maze regenerates — everything speeds up'],
+      ['EAT UP THE DOTS',   'Clear all dots to complete the level'],
+      ['PINK POWER-UPS',    'Become invincible and eat the ghosts!'],
     ]
     lines.forEach(([key, val], i) => {
-      this.add.text(W / 2 - 240, 220 + i * 32, key, {
+      this.add.text(W / 2 - 240, 190 + i * 34, key, {
         fontSize: '14px', fontFamily: 'Courier New, monospace', color: '#FF69B4',
       })
-      this.add.text(W / 2 - 240 + 220, 220 + i * 32, val, {
+      this.add.text(W / 2 - 20, 190 + i * 34, val, {
         fontSize: '14px', fontFamily: 'Courier New, monospace', color: '#e0e0e0',
       })
     })
 
+    // Characters: Porc-Man chasing 3 ghosts, evenly spaced across the strip
+    const charY   = 375
+    const charScale = 2.5
+    const xs = [160, 320, 480, 640]  // pig then 3 ghosts
+
+    const pigGfx = this.add.graphics()
+    drawPig(pigGfx, 0, 0, { dx: 1, dy: 0 })
+    pigGfx.setPosition(xs[0], charY).setScale(charScale)
+
+    const ghostGfxs = []
+    for (let i = 0; i < 3; i++) {
+      const g = this.add.graphics()
+      drawGhost(g, 0, 0, GHOST_COLORS[i], false, false)
+      g.setPosition(xs[i + 1], charY).setScale(charScale)
+      ghostGfxs.push(g)
+    }
+
+    // Gentle bob animation — ghosts staggered
+    const bobTween = (target, delay) => this.tweens.add({
+      targets: target, y: charY + 10,
+      duration: 550, yoyo: true, repeat: -1,
+      ease: 'Sine.easeInOut', delay,
+    })
+    bobTween(pigGfx, 0)
+    ghostGfxs.forEach((g, i) => bobTween(g, 140 * (i + 1)))
+
     // Press enter
-    const prompt = this.add.text(W / 2, 490, 'PRESS ENTER OR TAP TO START', {
+    const prompt = this.add.text(W / 2, 500, 'PRESS ENTER OR TAP TO START', {
       fontSize: '24px', fontFamily: 'Courier New, monospace', color: '#FFD700',
     }).setOrigin(0.5)
     this.tweens.add({ targets: prompt, alpha: 0, duration: 550, yoyo: true, repeat: -1 })
