@@ -130,7 +130,7 @@ export class Sounds {
   startMusic() {
     this.stopMusic();
     const track = Math.floor(Math.random() * MUSIC_TRACK_COUNT) + 1;
-    const audio = new Audio(`/music/${track}.mp3`);
+    const audio = new Audio(`${import.meta.env.BASE_URL}music/${track}.mp3`);
     audio.loop = true;
     audio.volume = 0.4;
     audio.play().catch(() => {}); // ignore autoplay policy errors
