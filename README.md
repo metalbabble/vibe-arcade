@@ -8,6 +8,9 @@ Games live under `games/` and are built independently via Vite. Games are launch
 
 ![Game screenshot 1](screenshot1.png)
 ![Game screenshot 2](screenshot2.png)
+![Game screenshot 3](screenshot3.png)
+![Game screenshot 4](screenshot4.png)
+![Game screenshot 5](screenshot5.png)
 
 ## Running Locally
 

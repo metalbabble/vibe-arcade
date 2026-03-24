@@ -1,0 +1,974 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Galaxplorer</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { background: #000011; overflow: hidden; font-family: 'Courier New', monospace; }
+canvas { display: block; position: fixed; top: 0; left: 0; }
+
+#ui { position: fixed; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; }
+
+#title-screen {
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  height: 100%; color: #00aaff;
+}
+#title-screen h1 {
+  font-size: 5em; font-weight: bold; letter-spacing: 0.3em;
+  text-shadow: 0 0 20px #00aaff, 0 0 60px #0055ff;
+  animation: glow 2s ease-in-out infinite;
+}
+@keyframes glow {
+  0%, 100% { text-shadow: 0 0 20px #00aaff, 0 0 60px #0055ff; }
+  50% { text-shadow: 0 0 40px #00ccff, 0 0 100px #0077ff, 0 0 150px #003399; }
+}
+#title-screen .press-enter {
+  font-size: 1.4em; margin-top: 2.5em; color: #88ccff;
+  animation: blink 1.2s step-end infinite;
+}
+@keyframes blink { 0%, 100% { opacity: 1; } 50% { opacity: 0; } }
+#title-screen .controls-info {
+  margin-top: 3em; font-size: 0.85em; color: #445566; line-height: 2;
+  text-align: center;
+}
+#title-screen .controls-info span { color: #667788; }
+
+#hud { display: none; }
+
+#health-wrap {
+  position: fixed; top: 16px; left: 20px;
+  display: flex; align-items: center; gap: 10px;
+}
+#health-label { color: #00ff88; font-size: 0.85em; letter-spacing: 0.1em; }
+#health-bg {
+  width: 200px; height: 14px; background: #0a1a0a; border: 1px solid #00aa55;
+  border-radius: 7px; overflow: hidden;
+}
+#health-fill {
+  height: 100%; width: 100%;
+  background: linear-gradient(90deg, #00ff88, #00cc66);
+  transition: width 0.15s, background 0.3s;
+}
+
+#score-display {
+  position: fixed; top: 16px; right: 20px; color: #ffcc00; font-size: 1.1em;
+  text-shadow: 0 0 8px #aa8800;
+}
+
+#overlay {
+  display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+  flex-direction: column; align-items: center; justify-content: center;
+  background: rgba(0,0,10,0.6);
+}
+#overlay h2 { font-size: 3em; color: #fff; margin-bottom: 0.6em; text-shadow: 0 0 30px currentColor; }
+#overlay p { font-size: 1.1em; color: #aab; }
+#overlay.gameover h2 { color: #ff3322; }
+#overlay.levelcomplete h2 { color: #00ffaa; }
+</style>
+</head>
+<body>
+<div id="ui">
+  <div id="title-screen">
+    <h1>GALAXPLORER</h1>
+    <div class="press-enter">PRESS ENTER TO START</div>
+    <div class="controls-info">
+      <span>W / S</span> — Pitch Up / Down &nbsp;&nbsp;&nbsp; <span>A / D</span> — Yaw Left / Right<br>
+      <span>,</span> — Thrust Forward &nbsp;&nbsp;&nbsp; <span>.</span> — Fire Laser<br><br>
+      Travel as far as you can · Collect atoms to restore shields
+    </div>
+  </div>
+
+  <div id="hud">
+    <div id="health-wrap">
+      <span id="health-label">SHIELDS</span>
+      <div id="health-bg"><div id="health-fill"></div></div>
+    </div>
+    <div id="score-display">SCORE: <span id="score-num">0</span></div>
+  </div>
+
+  <div id="overlay">
+    <h2 id="overlay-title"></h2>
+    <p id="overlay-sub"></p>
+  </div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+'use strict';
+
+// ─── AUDIO ────────────────────────────────────────────────────────────────────
+let AC = null;
+function ensureAudio() {
+  if (!AC) AC = new (window.AudioContext || window.webkitAudioContext)();
+  if (AC.state === 'suspended') AC.resume();
+}
+
+function playTone(freq, type, duration, vol, freqEnd) {
+  if (!AC) return;
+  const osc = AC.createOscillator();
+  const gain = AC.createGain();
+  osc.connect(gain); gain.connect(AC.destination);
+  osc.type = type;
+  osc.frequency.setValueAtTime(freq, AC.currentTime);
+  if (freqEnd) osc.frequency.exponentialRampToValueAtTime(freqEnd, AC.currentTime + duration);
+  gain.gain.setValueAtTime(vol, AC.currentTime);
+  gain.gain.exponentialRampToValueAtTime(0.001, AC.currentTime + duration);
+  osc.start(); osc.stop(AC.currentTime + duration);
+}
+
+function playNoise(duration, vol, filterFreq, filterType = 'lowpass') {
+  if (!AC) return;
+  const len = Math.floor(AC.sampleRate * duration);
+  const buf = AC.createBuffer(1, len, AC.sampleRate);
+  const data = buf.getChannelData(0);
+  for (let i = 0; i < len; i++) data[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / len, 1.2);
+  const src = AC.createBufferSource(); src.buffer = buf;
+  const filt = AC.createBiquadFilter(); filt.type = filterType; filt.frequency.value = filterFreq;
+  const gain = AC.createGain(); gain.gain.setValueAtTime(vol, AC.currentTime);
+  src.connect(filt); filt.connect(gain); gain.connect(AC.destination);
+  src.start();
+}
+
+function sfxLaser() { playTone(900, 'sawtooth', 0.13, 0.18, 100); }
+function sfxEnemyLaser() { playTone(180, 'sawtooth', 0.18, 0.15, 60); }
+function sfxThrust() { playNoise(0.12, 0.35, 140); }
+function sfxExplosion(size) {
+  const f = size === 'large' ? 280 : size === 'medium' ? 480 : 800;
+  const d = size === 'large' ? 0.9 : size === 'medium' ? 0.55 : 0.3;
+  const v = size === 'large' ? 0.7 : size === 'medium' ? 0.45 : 0.28;
+  playNoise(d, v, f);
+}
+function sfxCollect() {
+  [523, 659, 784, 1047].forEach((f, i) => {
+    setTimeout(() => playTone(f, 'sine', 0.18, 0.12), i * 70);
+  });
+}
+function sfxLevelComplete() {
+  [523, 659, 784, 1047, 1319].forEach((f, i) => {
+    setTimeout(() => playTone(f, 'square', 0.22, 0.09), i * 110);
+  });
+}
+function sfxGameOver() {
+  [440, 370, 311, 262].forEach((f, i) => {
+    setTimeout(() => playTone(f, 'sawtooth', 0.35, 0.18), i * 240);
+  });
+}
+function sfxEnemyHit() { playTone(440, 'square', 0.08, 0.12, 220); }
+function sfxShieldHit() { playNoise(0.15, 0.4, 600, 'bandpass'); }
+
+// ─── RENDERER & SCENE ────────────────────────────────────────────────────────
+const renderer = new THREE.WebGLRenderer({ antialias: true });
+renderer.setSize(window.innerWidth, window.innerHeight);
+renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+document.body.insertBefore(renderer.domElement, document.getElementById('ui'));
+
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x000610);
+
+const camera = new THREE.PerspectiveCamera(70, window.innerWidth / window.innerHeight, 0.1, 2000);
+
+// Lights
+scene.add(new THREE.AmbientLight(0x223355, 1.0));
+const sun = new THREE.DirectionalLight(0xffffff, 1.5);
+sun.position.set(1, 2, 0.5);
+scene.add(sun);
+const shipLight = new THREE.PointLight(0x4488ff, 0.8, 120);
+scene.add(shipLight);
+
+// ─── STARFIELD ───────────────────────────────────────────────────────────────
+let starField = null;
+(function buildStars() {
+  const N = 4000;
+  const geo = new THREE.BufferGeometry();
+  const pos = new Float32Array(N * 3);
+  const col = new Float32Array(N * 3);
+  for (let i = 0; i < N; i++) {
+    const r = 500 + Math.random() * 200;
+    const theta = Math.random() * Math.PI * 2;
+    const phi = Math.acos(2 * Math.random() - 1);
+    pos[i*3]   = r * Math.sin(phi) * Math.cos(theta);
+    pos[i*3+1] = r * Math.sin(phi) * Math.sin(theta);
+    pos[i*3+2] = r * Math.cos(phi);
+    const br = 0.6 + Math.random() * 0.4;
+    col[i*3]   = br * (0.75 + Math.random() * 0.25);
+    col[i*3+1] = br * (0.8 + Math.random() * 0.2);
+    col[i*3+2] = br;
+  }
+  geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+  geo.setAttribute('color', new THREE.BufferAttribute(col, 3));
+  starField = new THREE.Points(geo, new THREE.PointsMaterial({ size: 1.8, vertexColors: true, sizeAttenuation: false }));
+  scene.add(starField);
+})();
+
+// ─── PLAYER SHIP ─────────────────────────────────────────────────────────────
+function buildPlayerShip() {
+  const g = new THREE.Group();
+
+  const bodyMat  = new THREE.MeshPhongMaterial({ color: 0x7788bb, specular: 0x334488, shininess: 90 });
+  const darkMat  = new THREE.MeshPhongMaterial({ color: 0x445566, specular: 0x112233, shininess: 40 });
+  const cockMat  = new THREE.MeshPhongMaterial({ color: 0x44aaff, transparent: true, opacity: 0.75, specular: 0xffffff, shininess: 200 });
+  const glowMat  = new THREE.MeshBasicMaterial({ color: 0x3399ff });
+  const accentMat = new THREE.MeshPhongMaterial({ color: 0xaabbdd, specular: 0x556688, shininess: 60 });
+
+  // Fuselage
+  const fuselage = new THREE.Mesh(new THREE.BoxGeometry(1.0, 0.55, 4.2), bodyMat);
+  g.add(fuselage);
+
+  // Nose (pyramid-like)
+  const noseGeo = new THREE.ConeGeometry(0.38, 1.8, 4);
+  noseGeo.rotateX(Math.PI / 2);
+  const nose = new THREE.Mesh(noseGeo, accentMat);
+  nose.position.set(0, 0, 2.9);
+  g.add(nose);
+
+  // Cockpit bubble
+  const cockGeo = new THREE.SphereGeometry(0.35, 8, 6, 0, Math.PI * 2, 0, Math.PI / 2);
+  const cock = new THREE.Mesh(cockGeo, cockMat);
+  cock.position.set(0, 0.38, 0.6);
+  g.add(cock);
+
+  // Cockpit rim
+  const rimGeo = new THREE.TorusGeometry(0.36, 0.04, 6, 16, Math.PI);
+  const rim = new THREE.Mesh(rimGeo, accentMat);
+  rim.position.set(0, 0.38, 0.6);
+  g.add(rim);
+
+  // Wings - flat angled boxes
+  const wingGeo = new THREE.BoxGeometry(3.8, 0.12, 2.2);
+  const lWing = new THREE.Mesh(wingGeo, bodyMat);
+  lWing.position.set(2.4, -0.1, 0.0);
+  lWing.rotation.z = 0.08;
+  g.add(lWing);
+  const rWing = new THREE.Mesh(wingGeo, bodyMat);
+  rWing.position.set(-2.4, -0.1, 0.0);
+  rWing.rotation.z = -0.08;
+  g.add(rWing);
+
+  // Wing tips
+  const tipGeo = new THREE.BoxGeometry(0.3, 0.6, 1.8);
+  const lTip = new THREE.Mesh(tipGeo, accentMat);
+  lTip.position.set(4.3, -0.1, 0.0);
+  g.add(lTip);
+  const rTip = new THREE.Mesh(tipGeo, accentMat);
+  rTip.position.set(-4.3, -0.1, 0.0);
+  g.add(rTip);
+
+  // Tail fins
+  const finGeo = new THREE.BoxGeometry(0.1, 0.9, 1.4);
+  const lFin = new THREE.Mesh(finGeo, darkMat);
+  lFin.position.set(0.8, 0.4, -1.7);
+  g.add(lFin);
+  const rFin = new THREE.Mesh(finGeo, darkMat);
+  rFin.position.set(-0.8, 0.4, -1.7);
+  g.add(rFin);
+
+  // Engine pods
+  const podGeo = new THREE.CylinderGeometry(0.22, 0.28, 1.8, 7);
+  podGeo.rotateX(Math.PI / 2);
+  const lPod = new THREE.Mesh(podGeo, darkMat);
+  lPod.position.set(2.2, -0.15, -0.9);
+  g.add(lPod);
+  const rPod = new THREE.Mesh(podGeo, darkMat);
+  rPod.position.set(-2.2, -0.15, -0.9);
+  g.add(rPod);
+
+  // Engine glows
+  const glowGeo = new THREE.CircleGeometry(0.22, 10);
+  glowGeo.rotateX(Math.PI / 2);
+  const lGlow = new THREE.Mesh(glowGeo, glowMat);
+  lGlow.position.set(2.2, -0.15, -1.85);
+  g.add(lGlow);
+  const rGlow = new THREE.Mesh(glowGeo, glowMat);
+  rGlow.position.set(-2.2, -0.15, -1.85);
+  g.add(rGlow);
+
+  return g;
+}
+
+// ─── ASTEROID FACTORY ────────────────────────────────────────────────────────
+const SIZES = {
+  large:  { r: 5.5, hp: 3, score: 100, child: 'medium', nChild: 2 },
+  medium: { r: 2.8, hp: 2, score: 250, child: 'small',  nChild: 2 },
+  small:  { r: 1.3, hp: 1, score: 500, child: null,     nChild: 0 }
+};
+const ACOLORS = [0xcc6633,0xaa8844,0x887755,0x99aacc,0xbb9944,0x778899,0xaabb88,0xcc8866,0x8877aa,0x99cc99,0xbb7733,0x668899];
+
+function makeIrregularGeo(radius) {
+  const geo = new THREE.IcosahedronGeometry(radius, 1);
+  const pos = geo.attributes.position;
+  for (let i = 0; i < pos.count; i++) {
+    const scale = 0.75 + Math.random() * 0.5;
+    pos.setXYZ(i, pos.getX(i) * scale, pos.getY(i) * scale, pos.getZ(i) * scale);
+  }
+  pos.needsUpdate = true;
+  geo.computeVertexNormals();
+  return geo;
+}
+
+function spawnAsteroid(sizeName, pos, inheritVel) {
+  const cfg = SIZES[sizeName];
+  const color = ACOLORS[Math.floor(Math.random() * ACOLORS.length)];
+  const mesh = new THREE.Mesh(
+    makeIrregularGeo(cfg.r),
+    new THREE.MeshPhongMaterial({ color, flatShading: true, specular: 0x111111, shininess: 8 })
+  );
+  if (pos) mesh.position.copy(pos);
+  else mesh.position.set((Math.random()-0.5)*220, (Math.random()-0.5)*220, (Math.random()-0.5)*220);
+
+  const vel = new THREE.Vector3((Math.random()-0.5)*0.06, (Math.random()-0.5)*0.06, (Math.random()-0.5)*0.06);
+  if (inheritVel) vel.add(inheritVel);
+
+  scene.add(mesh);
+  return {
+    mesh, sizeName, cfg, alive: true,
+    vel, hp: cfg.hp, r: cfg.r,
+    rot: new THREE.Vector3((Math.random()-0.5)*0.018, (Math.random()-0.5)*0.018, (Math.random()-0.5)*0.018),
+    baseColor: color, flashTimer: 0
+  };
+}
+
+// ─── ENEMY SHIP ──────────────────────────────────────────────────────────────
+function spawnEnemy(pos) {
+  const g = new THREE.Group();
+  const bodyMat = new THREE.MeshPhongMaterial({ color: 0xbb1111, flatShading: true, specular: 0x440000 });
+  const accentMat = new THREE.MeshPhongMaterial({ color: 0x661111 });
+
+  // Central body
+  const body = new THREE.Mesh(new THREE.OctahedronGeometry(1.8, 0), bodyMat);
+  body.scale.set(1.1, 0.5, 1.6);
+  g.add(body);
+
+  // Side weapon arms
+  const armGeo = new THREE.BoxGeometry(3.5, 0.25, 0.8);
+  const arms = new THREE.Mesh(armGeo, accentMat);
+  arms.position.set(0, 0, 0);
+  g.add(arms);
+
+  // Cannon tips
+  [-1.8, 1.8].forEach(x => {
+    const tip = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.12, 0.8, 6), accentMat);
+    tip.rotation.x = Math.PI / 2;
+    tip.position.set(x, 0, 1.2);
+    g.add(tip);
+  });
+
+  // Sensor eye
+  const eye = new THREE.Mesh(new THREE.SphereGeometry(0.28, 8, 8), new THREE.MeshBasicMaterial({ color: 0xff3300 }));
+  eye.position.set(0, 0.6, 1.0);
+  g.add(eye);
+
+  if (pos) g.position.copy(pos);
+
+  scene.add(g);
+  return {
+    mesh: g, alive: true,
+    vel: new THREE.Vector3(),
+    hp: 2, r: 2.8,
+    shootTimer: Math.floor(120 + Math.random() * 180),
+    eye
+  };
+}
+
+// ─── ATOM (HEALTH PICKUP) ────────────────────────────────────────────────────
+function spawnAtom(pos) {
+  const g = new THREE.Group();
+  const nucleus = new THREE.Mesh(
+    new THREE.SphereGeometry(0.4, 10, 8),
+    new THREE.MeshPhongMaterial({ color: 0x00ff88, emissive: 0x003322, specular: 0xffffff, shininess: 120 })
+  );
+  g.add(nucleus);
+
+  const ringColors = [0x00ffaa, 0x00bbff, 0xffcc00];
+  const rings = [];
+  for (let i = 0; i < 3; i++) {
+    const ring = new THREE.Mesh(
+      new THREE.TorusGeometry(1.1, 0.07, 6, 24),
+      new THREE.MeshBasicMaterial({ color: ringColors[i] })
+    );
+    ring.rotation.set(Math.random()*Math.PI, Math.random()*Math.PI, Math.random()*Math.PI);
+    g.add(ring);
+    rings.push(ring);
+  }
+
+  if (pos) g.position.copy(pos);
+  else g.position.set((Math.random()-0.5)*180, (Math.random()-0.5)*180, (Math.random()-0.5)*180);
+
+  scene.add(g);
+  return {
+    mesh: g, alive: true, rings,
+    vel: new THREE.Vector3((Math.random()-0.5)*0.025, (Math.random()-0.5)*0.025, (Math.random()-0.5)*0.025),
+    r: 1.6, t: Math.random() * Math.PI * 2
+  };
+}
+
+// ─── LASER ───────────────────────────────────────────────────────────────────
+function spawnLaser(pos, dir, enemy) {
+  const color = enemy ? 0xff2200 : 0x00eeff;
+  const geo = new THREE.CylinderGeometry(0.07, 0.07, enemy ? 3.5 : 4, 5);
+  geo.rotateX(Math.PI / 2);
+  const mesh = new THREE.Mesh(geo, new THREE.MeshBasicMaterial({ color }));
+  mesh.position.copy(pos);
+  mesh.quaternion.setFromUnitVectors(new THREE.Vector3(0,0,1), dir.clone().normalize());
+  scene.add(mesh);
+
+  const speed = enemy ? 0.85 : 1.6;
+  return {
+    mesh, alive: true,
+    vel: dir.clone().normalize().multiplyScalar(speed),
+    enemy, life: 0, maxLife: enemy ? 210 : 160
+  };
+}
+
+// ─── PARTICLES ───────────────────────────────────────────────────────────────
+function spawnExplosion(pos, color, count) {
+  const out = [];
+  for (let i = 0; i < count; i++) {
+    const mesh = new THREE.Mesh(
+      new THREE.TetrahedronGeometry(0.12 + Math.random() * 0.22, 0),
+      new THREE.MeshBasicMaterial({ color })
+    );
+    mesh.position.copy(pos);
+    scene.add(mesh);
+    out.push({
+      mesh, life: 0, maxLife: 35 + Math.random() * 40,
+      vel: new THREE.Vector3((Math.random()-0.5)*0.6, (Math.random()-0.5)*0.6, (Math.random()-0.5)*0.6)
+    });
+  }
+  return out;
+}
+
+// ─── GAME STATE ──────────────────────────────────────────────────────────────
+const BOUNDS = 160;
+
+const G = {
+  mode: 'title',  // title | playing | gameover
+  score: 0,
+  health: 100, maxHealth: 100,
+
+  ship: null, shipVel: new THREE.Vector3(),
+  laserCD: 0, thrustCD: 0, invuln: 0,
+
+  asteroids: [], enemies: [], playerLasers: [], enemyLasers: [],
+  atoms: [], particles: [],
+
+  enemyTimer: 0,
+  spawnTimer: 0,
+  distanceTraveled: 0,
+  keys: {},
+
+  camPos: new THREE.Vector3(0, 5, -20),
+  camTarget: new THREE.Vector3(0, 0, 0),
+};
+
+// ─── HUD HELPERS ─────────────────────────────────────────────────────────────
+function hudUpdate() {
+  document.getElementById('score-num').textContent = G.score;
+  const pct = Math.max(0, G.health / G.maxHealth * 100);
+  const fill = document.getElementById('health-fill');
+  fill.style.width = pct + '%';
+  fill.style.background = pct > 55
+    ? 'linear-gradient(90deg,#00ff88,#00cc66)'
+    : pct > 25
+      ? 'linear-gradient(90deg,#ffcc00,#ff8800)'
+      : 'linear-gradient(90deg,#ff2200,#aa1100)';
+}
+
+function showOverlay(cls, title, sub) {
+  const ov = document.getElementById('overlay');
+  ov.className = cls;
+  ov.style.display = 'flex';
+  document.getElementById('overlay-title').textContent = title;
+  document.getElementById('overlay-sub').textContent = sub;
+}
+function hideOverlay() { document.getElementById('overlay').style.display = 'none'; }
+
+// ─── LEVEL INIT ──────────────────────────────────────────────────────────────
+function clearAll() {
+  [...G.asteroids, ...G.enemies, ...G.playerLasers, ...G.enemyLasers, ...G.atoms, ...G.particles]
+    .forEach(o => scene.remove(o.mesh));
+  G.asteroids = []; G.enemies = []; G.playerLasers = []; G.enemyLasers = [];
+  G.atoms = []; G.particles = [];
+}
+
+function initLevel() {
+  clearAll();
+  G.shipVel.set(0, 0, 0);
+  G.invuln = 150;
+  G.laserCD = 0; G.thrustCD = 0;
+  G.enemyTimer = Math.floor(480 + Math.random() * 360);
+  G.spawnTimer = 120;
+  G.distanceTraveled = 0;
+
+  if (G.ship) {
+    G.ship.position.set(0, 0, 0);
+    G.ship.quaternion.identity();
+  }
+  G.camPos.set(0, 5, -20);
+  G.camTarget.set(0, 0, 10);
+
+  // Spawn initial field of asteroids around the ship
+  for (let i = 0; i < 8; i++) {
+    let p;
+    do {
+      p = new THREE.Vector3((Math.random()-0.5)*200, (Math.random()-0.5)*160, (Math.random()-0.5)*200);
+    } while (p.length() < 35);
+    G.asteroids.push(spawnAsteroid('large', p));
+  }
+  for (let i = 0; i < 3; i++) {
+    const ang = Math.random() * Math.PI * 2;
+    const phi = Math.acos(2 * Math.random() - 1);
+    const r = 60 + Math.random() * 80;
+    const p = new THREE.Vector3(r*Math.sin(phi)*Math.cos(ang), r*Math.sin(phi)*Math.sin(ang), r*Math.cos(phi));
+    G.atoms.push(spawnAtom(p));
+  }
+
+  hudUpdate();
+}
+
+// ─── START GAME ──────────────────────────────────────────────────────────────
+function startGame() {
+  G.score = 0; G.health = 100; G.distanceTraveled = 0;
+
+  if (G.ship) scene.remove(G.ship);
+  G.ship = buildPlayerShip();
+  scene.add(G.ship);
+
+  document.getElementById('title-screen').style.display = 'none';
+  document.getElementById('hud').style.display = 'block';
+  hideOverlay();
+
+  G.mode = 'playing';
+  initLevel();
+}
+
+// ─── UTILITIES ───────────────────────────────────────────────────────────────
+function wrap(v) {
+  const B = BOUNDS;
+  if (v.x >  B) v.x -= 2*B; if (v.x < -B) v.x += 2*B;
+  if (v.y >  B) v.y -= 2*B; if (v.y < -B) v.y += 2*B;
+  if (v.z >  B) v.z -= 2*B; if (v.z < -B) v.z += 2*B;
+}
+function overlap(a, ra, b, rb) { return a.distanceToSquared(b) < (ra+rb)*(ra+rb); }
+function shipForward() { return new THREE.Vector3(0,0,1).applyQuaternion(G.ship.quaternion); }
+function shipUp()      { return new THREE.Vector3(0,1,0).applyQuaternion(G.ship.quaternion); }
+function shipRight()   { return new THREE.Vector3(1,0,0).applyQuaternion(G.ship.quaternion); }
+
+// ─── DESTROY HELPERS ────────────────────────────────────────────────────────
+function destroyAsteroid(ast) {
+  ast.alive = false;
+  scene.remove(ast.mesh);
+  sfxExplosion(ast.sizeName);
+  G.score += ast.cfg.score;
+  const cnt = ast.sizeName === 'large' ? 30 : ast.sizeName === 'medium' ? 18 : 8;
+  G.particles.push(...spawnExplosion(ast.mesh.position.clone(), ast.mesh.material.color.getHex(), cnt));
+
+  if (ast.cfg.child) {
+    for (let i = 0; i < ast.cfg.nChild; i++) {
+      const off = new THREE.Vector3((Math.random()-0.5)*8,(Math.random()-0.5)*8,(Math.random()-0.5)*8);
+      G.asteroids.push(spawnAsteroid(ast.cfg.child, ast.mesh.position.clone().add(off), ast.vel));
+    }
+  }
+  hudUpdate();
+  checkLevelDone();
+}
+
+function destroyEnemy(en) {
+  en.alive = false;
+  scene.remove(en.mesh);
+  sfxExplosion('medium');
+  G.score += 750;
+  G.particles.push(...spawnExplosion(en.mesh.position.clone(), 0xff3300, 28));
+  if (Math.random() < 0.45) G.atoms.push(spawnAtom(en.mesh.position.clone()));
+  hudUpdate();
+}
+
+function checkLevelDone() {
+  // No-op: infinite travel mode — objects are continuously spawned
+}
+
+function takeDamage(amt) {
+  if (G.invuln > 0) return;
+  G.health = Math.max(0, G.health - amt);
+  G.invuln = 70;
+  sfxShieldHit();
+  hudUpdate();
+  if (G.health <= 0) endGame();
+}
+
+function endGame() {
+  G.mode = 'gameover';
+  sfxGameOver();
+  showOverlay('gameover', 'GAME OVER', 'Press Enter to restart');
+}
+
+// ─── UPDATE SHIP ─────────────────────────────────────────────────────────────
+const TURN_SPEED = 0.048;
+const MAX_SPEED  = 1.4;
+const THRUST_ACC = 0.065;
+
+function updateShip() {
+  const fwd   = shipForward();
+  const up    = shipUp();
+  const right = shipRight();
+
+  const dq = new THREE.Quaternion();
+
+  if (G.keys['w'] || G.keys['W']) {
+    dq.setFromAxisAngle(right,  TURN_SPEED);
+    G.ship.quaternion.multiply(dq);
+  }
+  if (G.keys['s'] || G.keys['S']) {
+    dq.setFromAxisAngle(right, -TURN_SPEED);
+    G.ship.quaternion.multiply(dq);
+  }
+  if (G.keys['a'] || G.keys['A']) {
+    dq.setFromAxisAngle(up,  TURN_SPEED);
+    G.ship.quaternion.multiply(dq);
+  }
+  if (G.keys['d'] || G.keys['D']) {
+    dq.setFromAxisAngle(up, -TURN_SPEED);
+    G.ship.quaternion.multiply(dq);
+  }
+
+  // Thrust
+  if (G.keys[',']) {
+    G.shipVel.addScaledVector(shipForward(), THRUST_ACC);
+    if (G.shipVel.length() > MAX_SPEED) G.shipVel.setLength(MAX_SPEED);
+    if (G.thrustCD <= 0) { sfxThrust(); G.thrustCD = 9; }
+  }
+  if (G.thrustCD > 0) G.thrustCD--;
+
+  // Fire
+  if (G.keys['.'] && G.laserCD <= 0) {
+    const fwdNow = shipForward();
+    const lPos = G.ship.position.clone().addScaledVector(fwdNow, 5);
+    // Add ship velocity so lasers don't lag behind
+    const lDir = fwdNow.clone().add(G.shipVel.clone().multiplyScalar(0.3)).normalize();
+    G.playerLasers.push(spawnLaser(lPos, lDir, false));
+    sfxLaser();
+    G.laserCD = 11;
+  }
+  if (G.laserCD > 0) G.laserCD--;
+
+  G.ship.position.add(G.shipVel);
+  G.distanceTraveled += G.shipVel.length();
+  G.shipVel.multiplyScalar(0.978);
+
+  if (G.invuln > 0) G.invuln--;
+}
+
+// ─── UPDATE CAMERA ───────────────────────────────────────────────────────────
+function updateCamera() {
+  const fwd = shipForward();
+  const up  = shipUp();
+  const tPos = G.ship.position.clone()
+    .sub(fwd.clone().multiplyScalar(15))
+    .add(up.clone().multiplyScalar(4.5));
+  const tLook = G.ship.position.clone().add(fwd.clone().multiplyScalar(8));
+
+  G.camPos.lerp(tPos, 0.07);
+  G.camTarget.lerp(tLook, 0.07);
+
+  camera.position.copy(G.camPos);
+  camera.lookAt(G.camTarget);
+
+  shipLight.position.copy(G.ship.position);
+  if (starField) starField.position.copy(G.ship.position);
+}
+
+// ─── UPDATE ASTEROIDS ────────────────────────────────────────────────────────
+function updateAsteroids() {
+  for (const a of G.asteroids) {
+    if (!a.alive) continue;
+    a.mesh.position.add(a.vel);
+    a.mesh.rotation.x += a.rot.x;
+    a.mesh.rotation.y += a.rot.y;
+    a.mesh.rotation.z += a.rot.z;
+    if (a.flashTimer > 0) {
+      a.flashTimer--;
+      a.mesh.material.color.setHex(a.flashTimer > 0 ? 0xffffff : a.baseColor);
+    }
+  }
+}
+
+// ─── UPDATE ENEMIES ──────────────────────────────────────────────────────────
+function updateEnemies() {
+  // Spawn
+  G.enemyTimer--;
+  const maxEnemies = 1 + Math.floor(G.level / 2);
+  if (G.enemyTimer <= 0 && G.enemies.filter(e => e.alive).length < maxEnemies) {
+    const ang = Math.random() * Math.PI * 2;
+    const phi = Math.acos(2*Math.random()-1);
+    const r = 80 + Math.random() * 50;
+    const sp = new THREE.Vector3(
+      G.ship.position.x + r*Math.sin(phi)*Math.cos(ang),
+      G.ship.position.y + r*Math.sin(phi)*Math.sin(ang),
+      G.ship.position.z + r*Math.cos(phi)
+    );
+    G.enemies.push(spawnEnemy(sp));
+    G.enemyTimer = Math.floor(600 + Math.random() * 600);
+  }
+
+  for (const en of G.enemies) {
+    if (!en.alive) continue;
+    const toPlayer = G.ship.position.clone().sub(en.mesh.position).normalize();
+    en.vel.lerp(toPlayer.multiplyScalar(0.12), 0.025);
+    en.mesh.position.add(en.vel);
+    en.mesh.lookAt(G.ship.position);
+
+    // Pulse eye
+    const s = 0.9 + 0.2*Math.sin(Date.now()*0.005);
+    en.eye.scale.setScalar(s);
+
+    // Shoot
+    en.shootTimer--;
+    if (en.shootTimer <= 0) {
+      const dir = G.ship.position.clone().sub(en.mesh.position);
+      dir.x += (Math.random()-0.5)*0.35;
+      dir.y += (Math.random()-0.5)*0.35;
+      dir.z += (Math.random()-0.5)*0.35;
+      dir.normalize();
+      G.enemyLasers.push(spawnLaser(en.mesh.position.clone(), dir, true));
+      sfxEnemyLaser();
+      en.shootTimer = Math.floor(120 + Math.random() * 180);
+    }
+  }
+}
+
+// ─── UPDATE LASERS ───────────────────────────────────────────────────────────
+function updateLasers() {
+  // Player lasers
+  for (const l of G.playerLasers) {
+    if (!l.alive) continue;
+    l.mesh.position.add(l.vel);
+    l.life++;
+    if (l.life > l.maxLife) { scene.remove(l.mesh); l.alive = false; continue; }
+
+    for (const a of G.asteroids) {
+      if (!a.alive) continue;
+      if (overlap(l.mesh.position, 0.5, a.mesh.position, a.r * 0.85)) {
+        scene.remove(l.mesh); l.alive = false;
+        a.hp--;
+        a.flashTimer = 7;
+        a.mesh.material.color.setHex(0xffffff);
+        if (a.hp <= 0) destroyAsteroid(a);
+        else sfxEnemyHit();
+        break;
+      }
+    }
+    if (!l.alive) continue;
+    for (const en of G.enemies) {
+      if (!en.alive) continue;
+      if (overlap(l.mesh.position, 0.5, en.mesh.position, en.r)) {
+        scene.remove(l.mesh); l.alive = false;
+        en.hp--;
+        if (en.hp <= 0) destroyEnemy(en);
+        else sfxEnemyHit();
+        break;
+      }
+    }
+  }
+
+  // Enemy lasers
+  for (const l of G.enemyLasers) {
+    if (!l.alive) continue;
+    l.mesh.position.add(l.vel);
+    l.life++;
+    if (l.life > l.maxLife) { scene.remove(l.mesh); l.alive = false; continue; }
+
+    if (overlap(l.mesh.position, 0.4, G.ship.position, 2.5)) {
+      scene.remove(l.mesh); l.alive = false;
+      takeDamage(12);
+    }
+  }
+}
+
+// ─── UPDATE ATOMS ────────────────────────────────────────────────────────────
+function updateAtoms() {
+  for (const at of G.atoms) {
+    if (!at.alive) continue;
+    at.t += 0.025;
+    at.mesh.position.add(at.vel);
+    at.mesh.position.y += Math.sin(at.t) * 0.006;
+    at.mesh.rotation.y += 0.012;
+    at.rings[0].rotation.x += 0.022;
+
+    at.rings[1].rotation.y += 0.018;
+    at.rings[2].rotation.z += 0.014;
+
+    if (overlap(at.mesh.position, at.r, G.ship.position, 3.0)) {
+      scene.remove(at.mesh);
+      at.alive = false;
+      G.health = Math.min(G.maxHealth, G.health + 28);
+      sfxCollect();
+      hudUpdate();
+    }
+  }
+}
+
+// ─── UPDATE PARTICLES ────────────────────────────────────────────────────────
+function updateParticles() {
+  for (const p of G.particles) {
+    if (p.life >= p.maxLife) continue;
+    p.mesh.position.add(p.vel);
+    p.vel.multiplyScalar(0.94);
+    p.life++;
+    const t = p.life / p.maxLife;
+    p.mesh.material.opacity = 1 - t;
+    p.mesh.material.transparent = true;
+    if (p.life >= p.maxLife) scene.remove(p.mesh);
+  }
+  G.particles = G.particles.filter(p => p.life < p.maxLife);
+}
+
+// ─── UPDATE COLLISIONS ───────────────────────────────────────────────────────
+function updateCollisions() {
+  if (G.invuln > 0) return;
+
+  for (const a of G.asteroids) {
+    if (!a.alive) continue;
+    if (overlap(G.ship.position, 2.2, a.mesh.position, a.r * 0.75)) {
+      const push = G.ship.position.clone().sub(a.mesh.position).normalize();
+      G.shipVel.addScaledVector(push, 0.35);
+      takeDamage(a.sizeName === 'large' ? 22 : a.sizeName === 'medium' ? 12 : 6);
+      G.invuln = 80;
+      return;
+    }
+  }
+  for (const en of G.enemies) {
+    if (!en.alive) continue;
+    if (overlap(G.ship.position, 2.2, en.mesh.position, en.r)) {
+      takeDamage(28);
+      G.invuln = 100;
+      return;
+    }
+  }
+}
+
+// ─── UPDATE SHIP BLINK ───────────────────────────────────────────────────────
+function updateShipBlink() {
+  G.ship.visible = G.invuln <= 0 || Math.floor(G.invuln / 6) % 2 === 0;
+}
+
+// ─── CLEANUP DEAD OBJECTS ────────────────────────────────────────────────────
+function pruneArrays() {
+  G.asteroids    = G.asteroids.filter(a => a.alive);
+  G.enemies      = G.enemies.filter(e => e.alive);
+  G.playerLasers = G.playerLasers.filter(l => l.alive);
+  G.enemyLasers  = G.enemyLasers.filter(l => l.alive);
+  G.atoms        = G.atoms.filter(a => a.alive);
+}
+
+// ─── INPUT ───────────────────────────────────────────────────────────────────
+window.addEventListener('keydown', e => {
+  G.keys[e.key] = true;
+  if (['ArrowUp','ArrowDown',' '].includes(e.key)) e.preventDefault();
+
+  if (e.key === 'Enter') {
+    ensureAudio();
+    if (G.mode === 'title' || G.mode === 'gameover') startGame();
+  }
+  if (e.key === ',' || e.key === '.') e.preventDefault();
+});
+window.addEventListener('keyup', e => { G.keys[e.key] = false; });
+
+window.addEventListener('resize', () => {
+  camera.aspect = window.innerWidth / window.innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(window.innerWidth, window.innerHeight);
+});
+
+// ─── SPAWN / CULL SYSTEM ────────────────────────────────────────────────────
+const CULL_DIST     = 320;
+const MAX_ASTEROIDS = 28;
+const MAX_ATOMS     = 6;
+const SPAWN_INTERVAL = 160;
+
+function updateSpawnSystem() {
+  const sp = G.ship.position;
+
+  // Cull objects that have been left too far behind
+  G.asteroids.forEach(a => {
+    if (a.alive && a.mesh.position.distanceTo(sp) > CULL_DIST) {
+      scene.remove(a.mesh); a.alive = false;
+    }
+  });
+  G.atoms.forEach(at => {
+    if (at.alive && at.mesh.position.distanceTo(sp) > CULL_DIST) {
+      scene.remove(at.mesh); at.alive = false;
+    }
+  });
+  G.enemies.forEach(en => {
+    if (en.alive && en.mesh.position.distanceTo(sp) > CULL_DIST + 100) {
+      scene.remove(en.mesh); en.alive = false;
+    }
+  });
+
+  G.spawnTimer--;
+  if (G.spawnTimer > 0) return;
+  G.spawnTimer = SPAWN_INTERVAL;
+
+  // Spawn asteroids ahead of the ship
+  const liveAsteroids = G.asteroids.filter(a => a.alive).length;
+  const toSpawn = Math.max(0, MAX_ASTEROIDS - liveAsteroids);
+  const fwd = shipForward();
+  for (let i = 0; i < Math.min(toSpawn, 3); i++) {
+    // Random direction biased forward
+    const dir = new THREE.Vector3(
+      fwd.x + (Math.random()-0.5) * 1.6,
+      fwd.y + (Math.random()-0.5) * 1.6,
+      fwd.z + (Math.random()-0.5) * 1.6
+    ).normalize();
+    const dist = 160 + Math.random() * 80;
+    const pos = sp.clone().addScaledVector(dir, dist);
+    const size = Math.random() < 0.55 ? 'large' : (Math.random() < 0.6 ? 'medium' : 'small');
+    G.asteroids.push(spawnAsteroid(size, pos));
+  }
+
+  // Replenish atoms
+  const liveAtoms = G.atoms.filter(a => a.alive).length;
+  if (liveAtoms < MAX_ATOMS) {
+    const ang = Math.random() * Math.PI * 2;
+    const phi = Math.acos(2 * Math.random() - 1);
+    const r = 80 + Math.random() * 100;
+    const pos = new THREE.Vector3(
+      sp.x + r*Math.sin(phi)*Math.cos(ang),
+      sp.y + r*Math.sin(phi)*Math.sin(ang),
+      sp.z + r*Math.cos(phi)
+    );
+    G.atoms.push(spawnAtom(pos));
+  }
+}
+
+// ─── GAME LOOP ───────────────────────────────────────────────────────────────
+function loop() {
+  requestAnimationFrame(loop);
+
+  if (G.mode === 'playing') {
+    updateShip();
+    updateCamera();
+    updateAsteroids();
+    updateEnemies();
+    updateLasers();
+    updateAtoms();
+    updateParticles();
+    updateCollisions();
+    updateShipBlink();
+    updateSpawnSystem();
+    pruneArrays();
+    hudUpdate();
+  } else if (G.mode === 'title') {
+    // slowly rotate camera on title screen
+    const t = Date.now() * 0.0003;
+    camera.position.set(Math.sin(t)*30, 10, Math.cos(t)*30);
+    camera.lookAt(0, 0, 0);
+  }
+
+  renderer.render(scene, camera);
+}
+
+loop();
+</script>
+</body>
+</html>

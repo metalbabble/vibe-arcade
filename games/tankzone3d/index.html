@@ -1,0 +1,290 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Tankzone 3D</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { background: #000; overflow: hidden; font-family: 'Courier New', monospace; }
+
+    #app { width: 100vw; height: 100vh; position: relative; }
+
+    canvas { display: block; }
+
+    #hud {
+      position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+      pointer-events: none; color: #00ff44;
+    }
+
+    /* Crosshair */
+    #crosshair {
+      position: absolute; top: 50%; left: 50%;
+      transform: translate(-50%, -50%);
+    }
+    #crosshair::before, #crosshair::after {
+      content: '';
+      position: absolute;
+      background: #00ff44;
+    }
+    #crosshair::before {
+      width: 14px; height: 2px;
+      top: 50%; left: 50%;
+      transform: translate(-50%, -50%);
+    }
+    #crosshair::after {
+      width: 2px; height: 14px;
+      top: 50%; left: 50%;
+      transform: translate(-50%, -50%);
+    }
+    #crosshair-ring {
+      width: 24px; height: 24px;
+      border: 1px solid rgba(0, 255, 68, 0.5);
+      border-radius: 50%;
+    }
+
+    /* Level banner */
+    #level-banner {
+      position: absolute; top: 20px; left: 50%;
+      transform: translateX(-50%);
+      font-size: 13px; letter-spacing: 4px;
+      text-shadow: 0 0 8px #00ff44;
+      opacity: 0;
+      transition: opacity 0.4s;
+    }
+    #level-banner.visible { opacity: 1; }
+
+    /* Victory banner */
+    #victory-banner {
+      position: absolute; top: 50%; left: 50%;
+      transform: translate(-50%, -50%);
+      font-size: clamp(32px, 6vw, 64px);
+      letter-spacing: 10px;
+      text-shadow: 0 0 20px #00ff44, 0 0 40px #00ff44;
+      opacity: 0;
+      transition: opacity 0.4s;
+      pointer-events: none;
+    }
+    #victory-banner.visible { opacity: 1; }
+
+    /* Player health */
+    #hud-bottom-left {
+      position: absolute; bottom: 30px; left: 30px;
+    }
+    .hud-label { font-size: 10px; letter-spacing: 3px; opacity: 0.7; margin-bottom: 4px; }
+    .health-bar-outer {
+      width: 180px; height: 10px;
+      border: 1px solid currentColor;
+      position: relative;
+    }
+    .health-bar-inner {
+      height: 100%; width: 100%;
+      transition: width 0.2s;
+    }
+    #player-bar .health-bar-inner { background: #00ff44; }
+    #player-health-val { font-size: 11px; margin-top: 3px; opacity: 0.8; }
+
+    /* Enemy list */
+    #hud-bottom-right {
+      position: absolute; bottom: 30px; right: 30px;
+      text-align: right; color: #ff4400;
+    }
+    #enemy-bars { display: flex; flex-direction: column; gap: 6px; align-items: flex-end; }
+    .enemy-bar-row .health-bar-inner { background: #ff4400; }
+    .enemy-bar-row .health-bar-outer { border-color: #ff4400; }
+
+    /* Kill counter */
+    #kills {
+      position: absolute; top: 20px; right: 30px;
+      font-size: 11px; letter-spacing: 2px; opacity: 0.7;
+    }
+
+    /* Damage flash */
+    #damage-flash {
+      position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+      background: rgba(255, 68, 0, 0);
+      pointer-events: none;
+      transition: background 0.05s;
+    }
+
+    /* Overlay screens */
+    #overlay {
+      position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+      background: rgba(0, 0, 0, 0.88);
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
+      color: #00ff44; font-family: 'Courier New', monospace;
+      z-index: 100;
+    }
+    #overlay.hidden { display: none; }
+
+    #overlay h1 {
+      font-size: clamp(40px, 8vw, 80px);
+      letter-spacing: 12px;
+      text-shadow: 0 0 30px #00ff44, 0 0 60px #00ff44;
+      margin-bottom: 16px;
+      animation: flicker 4s infinite;
+    }
+    @keyframes flicker {
+      0%, 95%, 100% { opacity: 1; }
+      96% { opacity: 0.7; }
+      97% { opacity: 1; }
+      98% { opacity: 0.5; }
+    }
+
+    #overlay .subtitle {
+      font-size: 13px; letter-spacing: 3px; opacity: 0.6; margin-bottom: 40px;
+    }
+
+    .controls-list {
+      font-size: 12px; letter-spacing: 2px; opacity: 0.5;
+      line-height: 2; margin-bottom: 40px; text-align: center;
+    }
+
+    #overlay-msg {
+      font-size: 18px; letter-spacing: 4px;
+      margin-bottom: 12px; opacity: 0.9;
+    }
+    #overlay-sub {
+      font-size: 12px; letter-spacing: 2px; opacity: 0.5; margin-bottom: 40px;
+    }
+
+    /* Next battle overlay mode */
+    #overlay.next-battle h1 {
+      font-size: clamp(14px, 2.2vw, 28px);
+      letter-spacing: 6px;
+      margin-bottom: 20px;
+    }
+    #overlay.next-battle .subtitle,
+    #overlay.next-battle .controls-list { display: none; }
+    #overlay.next-battle #overlay-msg {
+      font-size: clamp(60px, 12vw, 120px);
+      letter-spacing: 8px;
+      margin-bottom: 6px;
+      opacity: 1;
+    }
+    #overlay.next-battle #overlay-sub { margin-bottom: 32px; }
+
+    /* Difficulty selector */
+    #difficulty-selector {
+      display: flex; gap: 12px; margin-bottom: 28px;
+    }
+    .diff-btn {
+      font-family: 'Courier New', monospace;
+      font-size: 11px; letter-spacing: 3px;
+      color: #00ff44; background: transparent;
+      border: 1px solid rgba(0, 255, 68, 0.3);
+      padding: 6px 14px; cursor: pointer;
+      transition: border-color 0.15s, opacity 0.15s, text-shadow 0.15s;
+      opacity: 0.5;
+    }
+    .diff-btn:hover { opacity: 0.85; border-color: rgba(0, 255, 68, 0.7); }
+    .diff-btn.selected {
+      opacity: 1;
+      border-color: #00ff44;
+      text-shadow: 0 0 8px #00ff44;
+    }
+    #overlay.next-battle #difficulty-selector { display: none; }
+
+    /* Enter prompt */
+    #overlay-enter-prompt {
+      font-size: 12px; letter-spacing: 4px; opacity: 0.6;
+      animation: blink 1.4s ease-in-out infinite;
+      cursor: pointer;
+      padding: 8px 16px;
+      border: 1px solid rgba(0, 255, 68, 0.5);
+      transition: border-color 0.15s, opacity 0.15s;
+    }
+    #overlay-enter-prompt:hover {
+      border-color: #00ff44;
+      opacity: 1;
+      animation: none;
+    }
+    @keyframes blink {
+      0%, 100% { opacity: 0.6; }
+      50% { opacity: 1; }
+    }
+
+    /* Glass-break overlay */
+    #glass-break {
+      position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+      z-index: 160;
+      background: rgba(160, 0, 0, 0);
+      pointer-events: all;
+      transition: background 1.1s ease-in;
+    }
+    #glass-break.shatter { background: rgba(160, 0, 0, 0.78); }
+    #glass-break.fade-out { transition: opacity 0.5s ease-in; opacity: 0; }
+    #glass-break.hidden { display: none; }
+    #glass-cracks { position: absolute; top: 0; left: 0; width: 100%; height: 100%; }
+
+    /* Scan lines */
+    #scanlines {
+      position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+      background: repeating-linear-gradient(
+        0deg,
+        transparent,
+        transparent 2px,
+        rgba(0,0,0,0.07) 2px,
+        rgba(0,0,0,0.07) 4px
+      );
+      pointer-events: none; z-index: 50;
+    }
+  </style>
+</head>
+<body>
+  <div id="app"></div>
+
+  <div id="hud" class="hidden">
+    <div id="crosshair"><div id="crosshair-ring"></div></div>
+
+    <div id="level-banner">LEVEL 1 — ENGAGE</div>
+    <div id="victory-banner">VICTORY</div>
+
+    <div id="hud-bottom-left">
+      <div class="hud-label">HULL INTEGRITY</div>
+      <div id="player-bar">
+        <div class="health-bar-outer">
+          <div class="health-bar-inner" id="player-health-fill"></div>
+        </div>
+        <div id="player-health-val">100</div>
+      </div>
+    </div>
+
+    <div id="hud-bottom-right">
+      <div class="hud-label" style="text-align:right">HOSTILES</div>
+      <div id="enemy-bars"></div>
+    </div>
+
+    <div id="kills">KILLS: <span id="kill-count">0</span></div>
+    <div id="damage-flash"></div>
+  </div>
+
+  <div id="overlay">
+    <h1 id="overlay-title">TANKZONE 3D</h1>
+    <div class="subtitle">TANK COMBAT SYSTEM</div>
+    <div class="controls-list">
+      W / S &nbsp;&mdash;&nbsp; ADVANCE / REVERSE<br>
+      A / D &nbsp;&mdash;&nbsp; TURN LEFT / RIGHT<br>
+      MOUSE &nbsp;&mdash;&nbsp; AIM<br>
+      CLICK / SPACE &nbsp;&mdash;&nbsp; FIRE<br>
+      GREEN CRYSTALS &nbsp;&mdash;&nbsp; RESTORE HULL
+    </div>
+    <div id="overlay-msg"></div>
+    <div id="overlay-sub"></div>
+    <div id="difficulty-selector">
+      <button class="diff-btn" data-diff="easy">EASY</button>
+      <button class="diff-btn selected" data-diff="medium">MEDIUM</button>
+      <button class="diff-btn" data-diff="hard">HARD</button>
+    </div>
+    <div id="overlay-enter-prompt">CLICK HERE OR PRESS ENTER TO CONTINUE</div>
+  </div>
+
+  <div id="glass-break" class="hidden">
+    <svg id="glass-cracks"></svg>
+  </div>
+
+  <div id="scanlines"></div>
+
+  <script type="module" src="/src/main.js"></script>
+</body>
+</html>
