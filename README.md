@@ -6,6 +6,7 @@ Games live under `games/` and are built independently via Vite. Games are launch
 
 [Try out Vibe Arcade here!](https://metalbabble.github.io/vibe-arcade/)
 
+![Vibe Arcade](vibe-arcade.png)
 ![Game screenshot 1](screenshot1.png)
 ![Game screenshot 2](screenshot2.png)
 ![Game screenshot 3](screenshot3.png)
