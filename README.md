@@ -31,11 +31,15 @@ vibe-arcade/
 │   └── touch-controller.js   # mobile joystick overlay, imported by every game
 ├── games/
 │   ├── brickout/       # Vite + Phaser 3 game
+│   ├── brickout-plus/  # Vite + Phaser 3 game (power-ups)
 │   ├── pong-game/      # Vite + Phaser 3 game
 │   ├── roids/          # Vite + vanilla Canvas game
 │   ├── sentra-pede/    # Vite + vanilla Canvas game
 │   ├── face-invaders/  # Vite + vanilla Canvas game
-│   └── conflict/       # Vite + Phaser 3 game (multi-scene)
+│   ├── conflict/       # Vite + Phaser 3 game (multi-scene)
+│   ├── porc-man/       # Vite + Phaser 3 game (procedural maze)
+│   ├── tankzone3d/     # Vite + vanilla Canvas game (first-person 3D)
+│   └── galaxplorer/    # Vite + vanilla Canvas game
 └── dist/               # build output (git-ignored)
     ├── index.html
     ├── brickout/
@@ -69,11 +73,11 @@ import '../../../shared/touch-controller.js'
 
 Vite bundles it in. No manual copying needed.
 
-### Vanilla Canvas games (roids, sentra-pede, face-invaders)
+### Vanilla Canvas games (roids, sentra-pede, face-invaders, tankzone3d, galaxplorer)
 
 These games keep their raw `game.js` in `public/` (Vite copies it unchanged to `dist/`). The `src/main.js` only imports the touch-controller. No game logic changes were needed to integrate them into the build system.
 
-### Phaser games (brickout, pong-game, conflict)
+### Phaser games (brickout, brickout-plus, pong-game, conflict, porc-man)
 
 Phaser is imported from npm and bundled by Vite. The `conflict` game uses multiple scenes organised under `src/scenes/`, `src/ai/`, and `src/utils/` as proper ES modules.
 
